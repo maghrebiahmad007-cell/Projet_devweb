@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Jeu Snake — Single Page</title>
+  <style>
+    :root{--bg:#0f1724;--panel:#0b1220;--accent:#06b6d4;--muted:#94a3b8;--danger:#ef4444}
+    *{box-sizing:border-box;font-family:Inter,ui-sans-serif,system-ui,Segoe UI,Roboto,"Helvetica Neue",Arial}
+    html,body{height:100%;margin:0;background:linear-gradient(180deg,#071027 0%, #071a2a 60%);color:#e6eef6}
+    .wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:32px}
+    .card{width:980px;max-width:95vw;background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));border-radius:16px;padding:20px;box-shadow:0 10px 30px rgba(2,6,23,0.6);display:grid;grid-template-columns:1fr 360px;gap:20px;align-items:start}
+
+    /* Left: game area */
+    .game-area{display:flex;flex-direction:column;align-items:center;gap:12px}
+    .hud{width:100%;display:flex;justify-content:space-between;align-items:center}
+    .title{font-weight:700;letter-spacing:0.2px}
+    .score-pill{background:linear-gradient(90deg, rgba(6,182,212,0.12), rgba(6,182,212,0.06));padding:8px 12px;border-radius:999px;color:var(--accent);font-weight:600;border:1px solid rgba(6,182,212,0.08)}
+    canvas{background:linear-gradient(180deg,#061425 0%, #072034 100%);border-radius:12px;box-shadow:0 6px 18px rgba(2,6,23,0.6);width:100%;max-width:720px;height:auto;border:1px solid rgba(255,255,255,0.03)}
+
+    /* Right: controls and leaderboard */
+    .panel{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));border-radius:12px;padding:16px;border:1px solid rgba(255,255,255,0.02)}
+    .controls{display:grid;gap:8px}
+    button{background:transparent;border:1px solid rgba(255,255,255,0.04);padding:10px 12px;border-radius:8px;color:inherit;font-weight:600;cursor:pointer}
+    .btn-primary{background:linear-gradient(90deg,var(--accent),#7c3aed);border:none;color:#042027}
+    .muted{color:var(--muted);font-size:13px}
+    .leader{margin-top:12px}
+    .leader-item{display:flex;justify-content:space-between;padding:8px;border-radius:8px}
+    .styled-select {
+        background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+        border: 1px solid rgba(255,255,255,0.06);
+        color: #e6eef6;
+        border-radius: 8px;
+        padding: 8px 12px;
+        font-weight: 600;
+        outline: none;
+        cursor: pointer;
+        transition: background 0.2s, border-color 0.2s;
+        }
+    .styled-select:hover {
+    border-color: rgba(6,182,212,0.3);
+    background: rgba(6,182,212,0.04);
+    }
+    .styled-select option {
+    background: #0b1220;
+    color: #e6eef6;
+    }
+
+    /* Game over modal overlay */
+    .overlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none}
+    .modal{pointer-events:auto;background:linear-gradient(180deg,#0b1220 0%, #071428 100%);padding:22px;border-radius:12px;border:1px solid rgba(255,255,255,0.03);box-shadow:0 10px 40px rgba(2,6,23,0.6);text-align:center;min-width:320px}
+    .modal h2{margin:0 0 8px}
+    .meta{color:var(--muted);font-size:13px;margin-bottom:12px}
+
+    footer{margin-top:10px;color:var(--muted);font-size:13px;text-align:right}
+    @media (max-width:920px){.card{grid-template-columns:1fr}} 
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <div class="game-area">
+        <div class="hud">
+          <div>
+            <div class="title">Jeu Snake</div>
+            <div class="muted">Contrôles: Flèches / WASD • Appuyez sur P pour pause</div>
+          </div>
+          <div class="score-pill">Score: <span id="score">0</span> • High: <span id="high">0</span></div>
+        </div>
+
+        <canvas id="game" width="720" height="480" aria-label="Zone de jeu Snake"></canvas>
+        <div style="display:flex;gap:8px;width:100%;justify-content:center">
+          <button id="btn-play" class="btn-primary">Jouer</button>
+          <button id="btn-pause">Pause</button>
+          <button id="btn-reset">Réinitialiser HS</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3 style="margin:0 0 8px">Paramètres & Tableau</h3>
+        <div class="controls">
+          <label class="muted">Vitesse <span id="speed-val">8</span></label>
+          <input id="speed" type="range" min="4" max="18" value="8">
+          <label class="muted">Mode :</label>
+            <select id="mode" class="styled-select">
+            <option value="wrap">Mur traversable (wrap)</option>
+            <option value="wall">Mur collision (mur fatal)</option>
+            </select>
+          <label class="muted">Taille grille <span id="cell-val">20</span></label>
+          <input id="cells" type="range" min="12" max="36" value="20">
+          <div style="display:flex;gap:8px;margin-top:8px">
+            <button id="btn-eat">Forcer pomme</button>
+            <button id="btn-sfx">Toggle SFX</button>
+          </div>
+        </div>
+
+        <div class="leader">
+          <h4 style="margin:12px 0 6px">Meilleurs scores</h4>
+          <div id="leaderboard" style="display:grid;gap:6px"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="overlay" id="overlay" style="display:none">
+    <div class="modal" id="modal">
+      <h2 id="mo-title">Game Over</h2>
+      <div class="meta" id="mo-meta">Votre score: <strong id="mo-score">0</strong></div>
+      <div style="display:flex;gap:8px;justify-content:center">
+        <button id="mo-restart" class="btn-primary">Rejouer</button>
+        <button id="mo-close">Fermer</button>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
